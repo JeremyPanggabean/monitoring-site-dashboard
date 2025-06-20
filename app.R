@@ -123,7 +123,7 @@ server <- function(input, output) {
     df <- df[order(df$view_count), ]
     plot_ly(df, x = ~view_count, y = ~reorder(page_url, view_count), type = 'bar', orientation = 'h',
             marker = list(color = '#3498db')) %>%
-      layout(title = "Halaman Paling Jarang Dikunjungi (5 Terbawah)",
+      layout(title = "Halaman Populer (5 Teratas)",
              xaxis = list(title = "Jumlah Kunjungan"),
              yaxis = list(title = "Halaman"))
   })
