@@ -4,114 +4,97 @@ library(shinydashboard)
 library(DT)
 library(plotly)
 library(dplyr)
-library(lubridate)
+library(RPostgreSQL)
 
-# Sample data (replace with your actual data source)
-daily_visit <- data.frame(
-  summary_date = as.Date(c("2025-06-01", "2025-06-02", "2025-06-03", "2025-06-04", 
-                          "2025-06-05", "2025-06-06", "2025-06-07", "2025-06-08", 
-                          "2025-06-09", "2025-06-10")),
-  total_visits = c(64, 73, 65, 52, 45, 76, 49, 53, 57, 61),
-  unique_users = c(26, 39, 38, 48, 37, 26, 30, 22, 29, 34),
-  avg_session_duration_minutes = c(27.5, 29.7, 35.0, 42.1, 52.9, 59.8, 38.3, 57.1, 56.3, 46.4)
+# Simple database connection function
+get_db_connection <- function() {
+  tryCatch({
+    dbConnect(
+      PostgreSQL(),
+      host = "yamabiko.proxy.rlwy.net",
+      port = 25400,
+      dbname = "railway",
+      user = "postgres",
+      password = "KtrbXrizoOvxDGjqYpkYKJTVXmDHuKZo"
+    )
+  }, error = function(e) {
+    cat("Database connection failed:", e$message, "\n")
+    NULL
+  })
+}
+
+# Simple data loading with fallback
+load_data <- function(query, default_data) {
+  con <- get_db_connection()
+  if (is.null(con)) {
+    return(default_data)
+  }
+  
+  result <- tryCatch({
+    dbGetQuery(con, query)
+  }, error = function(e) {
+    cat("Query failed:", e$message, "\n")
+    default_data
+  })
+  
+  dbDisconnect(con)
+  
+  if (nrow(result) == 0) {
+    return(default_data)
+  }
+  return(result)
+}
+
+# Default sample data
+default_daily <- data.frame(
+  summary_date = as.Date(c("2025-06-15", "2025-06-16", "2025-06-17", "2025-06-18", "2025-06-19", "2025-06-20")),
+  total_visits = c(45, 62, 58, 71, 83, 76),
+  unique_users = c(28, 41, 35, 48, 52, 44),
+  avg_session_duration_minutes = c(32.5, 28.3, 41.2, 35.8, 29.1, 38.7)
 )
 
-top_pages <- data.frame(
-  page_url = c("/perpustakaan/buku/psikologi-modern", "/perpustakaan/jurnal/teknologi-informasi",
-               "/perpustakaan/karya-ilmiah/skripsi-manajemen", "/perpustakaan/buku/ekonomi-digital",
-               "/perpustakaan/jurnal/kesehatan-masyarakat", "/perpustakaan/buku/sastra-indonesia",
-               "/perpustakaan/karya-ilmiah/tesis-pendidikan", "/perpustakaan/jurnal/hukum-perdata",
-               "/perpustakaan/buku/desain-komunikasi-visual", "/perpustakaan/jurnal/arsitektur-nusantara"),
-  view_count = c(85, 120, 67, 92, 78, 54, 40, 95, 63, 88)
+default_pages <- data.frame(
+  page_url = c("Jurnal Teknologi", "Buku Psikologi", "Skripsi Manajemen", "Buku Ekonomi", "Jurnal Kesehatan"),
+  view_count = c(156, 134, 98, 87, 76)
 )
 
-user_actions <- data.frame(
-  action_type = c("Login", "Search", "Download", "View", "Bookmark", "Share", "Comment", "Upload"),
-  action_count = c(245, 423, 156, 789, 89, 34, 67, 23)
-)
-
-# Define UI
+# UI
 ui <- dashboardPage(
   dashboardHeader(title = "Dashboard Perpustakaan Digital"),
-  
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Overview", tabName = "overview", icon = icon("tachometer-alt")),
-      menuItem("Kunjungan Harian", tabName = "daily", icon = icon("chart-line")),
-      menuItem("Halaman Populer", tabName = "pages", icon = icon("star")),
-      menuItem("Aktivitas User", tabName = "actions", icon = icon("users"))
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("tachometer-alt")),
+      menuItem("Halaman Populer", tabName = "pages", icon = icon("star"))
     )
   ),
-  
   dashboardBody(
-    tags$head(
-      tags$style(HTML("
-        .content-wrapper, .right-side {
-          background-color: #f4f4f4;
-        }
-      "))
-    ),
-    
     tabItems(
-      # Overview Tab
+      # Main dashboard
       tabItem(
-        tabName = "overview",
+        tabName = "dashboard",
         fluidRow(
-          valueBoxOutput("total_visits_box"),
-          valueBoxOutput("unique_users_box"),
-          valueBoxOutput("avg_duration_box")
+          valueBoxOutput("total_visits"),
+          valueBoxOutput("unique_users"),
+          valueBoxOutput("avg_duration")
         ),
         fluidRow(
           box(
-            title = "Ringkasan Statistik", status = "primary", solidHeader = TRUE, width = 12,
-            tableOutput("summary_stats")
+            title = "Kunjungan Harian", status = "primary", solidHeader = TRUE, width = 12,
+            plotlyOutput("visits_chart")
           )
         )
       ),
-      
-      # Daily Visits Tab
-      tabItem(
-        tabName = "daily",
-        fluidRow(
-          box(
-            title = "Grafik Kunjungan Harian", status = "primary", solidHeader = TRUE, width = 12,
-            plotlyOutput("daily_visits_plot")
-          )
-        ),
-        fluidRow(
-          box(
-            title = "Data Kunjungan Harian", status = "info", solidHeader = TRUE, width = 12,
-            DT::dataTableOutput("daily_visits_table")
-          )
-        )
-      ),
-      
-      # Top Pages Tab
+      # Top pages
       tabItem(
         tabName = "pages",
         fluidRow(
           box(
-            title = "Top 10 Halaman Populer", status = "success", solidHeader = TRUE, width = 6,
-            plotlyOutput("top_pages_plot")
+            title = "Halaman Populer", status = "success", solidHeader = TRUE, width = 6,
+            plotlyOutput("pages_chart")
           ),
           box(
-            title = "Daftar Halaman Populer", status = "success", solidHeader = TRUE, width = 6,
-            DT::dataTableOutput("top_pages_table")
-          )
-        )
-      ),
-      
-      # User Actions Tab
-      tabItem(
-        tabName = "actions",
-        fluidRow(
-          box(
-            title = "Distribusi Aktivitas User", status = "warning", solidHeader = TRUE, width = 6,
-            plotlyOutput("user_actions_plot")
-          ),
-          box(
-            title = "Detail Aktivitas User", status = "warning", solidHeader = TRUE, width = 6,
-            DT::dataTableOutput("user_actions_table")
+            title = "Data Halaman", status = "info", solidHeader = TRUE, width = 6,
+            DT::dataTableOutput("pages_table")
           )
         )
       )
@@ -119,129 +102,87 @@ ui <- dashboardPage(
   )
 )
 
-# Define Server
+# Server
 server <- function(input, output) {
   
-  # Value Boxes
-  output$total_visits_box <- renderValueBox({
+  # Load data
+  daily_data <- load_data(
+    "SELECT summary_date, total_visits, unique_users, avg_session_duration_minutes FROM daily_visit ORDER BY summary_date DESC LIMIT 10",
+    default_daily
+  )
+  
+  pages_data <- load_data(
+    "SELECT page_url, view_count FROM top_pages ORDER BY view_count DESC LIMIT 10",
+    default_pages
+  )
+  
+  # Ensure date format
+  if ("summary_date" %in% names(daily_data)) {
+    daily_data$summary_date <- as.Date(daily_data$summary_date)
+  }
+  
+  # Value boxes
+  output$total_visits <- renderValueBox({
     valueBox(
-      value = sum(daily_visit$total_visits),
+      value = sum(daily_data$total_visits, na.rm = TRUE),
       subtitle = "Total Kunjungan",
       icon = icon("eye"),
       color = "blue"
     )
   })
   
-  output$unique_users_box <- renderValueBox({
+  output$unique_users <- renderValueBox({
     valueBox(
-      value = sum(daily_visit$unique_users),
-      subtitle = "Total User Unik",
+      value = sum(daily_data$unique_users, na.rm = TRUE),
+      subtitle = "User Unik",
       icon = icon("users"),
       color = "green"
     )
   })
   
-  output$avg_duration_box <- renderValueBox({
+  output$avg_duration <- renderValueBox({
     valueBox(
-      value = round(mean(daily_visit$avg_session_duration_minutes), 1),
+      value = round(mean(daily_data$avg_session_duration_minutes, na.rm = TRUE), 1),
       subtitle = "Rata-rata Durasi (menit)",
       icon = icon("clock"),
       color = "yellow"
     )
   })
   
-  # Summary Statistics
-  output$summary_stats <- renderTable({
-    data.frame(
-      Metrik = c("Total Kunjungan", "Total User Unik", "Rata-rata Durasi Sesi (menit)", "Total Halaman Dilihat"),
-      Nilai = c(
-        sum(daily_visit$total_visits),
-        sum(daily_visit$unique_users),
-        round(mean(daily_visit$avg_session_duration_minutes), 1),
-        sum(top_pages$view_count)
-      )
-    )
-  })
-  
-  # Daily Visits Plot
-  output$daily_visits_plot <- renderPlotly({
-    p <- ggplot(daily_visit, aes(x = summary_date)) +
-      geom_line(aes(y = total_visits, color = "Total Kunjungan"), size = 1.2) +
-      geom_line(aes(y = unique_users, color = "User Unik"), size = 1.2) +
-      geom_point(aes(y = total_visits, color = "Total Kunjungan"), size = 3) +
-      geom_point(aes(y = unique_users, color = "User Unik"), size = 3) +
-      labs(title = "Trend Kunjungan Harian",
-           x = "Tanggal",
-           y = "Jumlah",
-           color = "Metrik") +
+  # Visits chart
+  output$visits_chart <- renderPlotly({
+    p <- ggplot(daily_data, aes(x = summary_date)) +
+      geom_line(aes(y = total_visits, color = "Total Visits"), size = 1.2) +
+      geom_point(aes(y = total_visits, color = "Total Visits"), size = 3) +
+      labs(title = "Trend Kunjungan Harian", x = "Tanggal", y = "Jumlah", color = "Metrik") +
       theme_minimal() +
-      scale_color_manual(values = c("Total Kunjungan" = "#3498db", "User Unik" = "#e74c3c"))
+      scale_color_manual(values = c("Total Visits" = "#3498db"))
     
     ggplotly(p)
   })
   
-  # Daily Visits Table
-  output$daily_visits_table <- DT::renderDataTable({
-    daily_visit %>%
-      mutate(summary_date = as.character(summary_date)) %>%
-      DT::datatable(
-        options = list(pageLength = 10, scrollX = TRUE),
-        colnames = c("Tanggal", "Total Kunjungan", "User Unik", "Rata-rata Durasi (menit)")
-      )
-  })
-  
-  # Top Pages Plot
-  output$top_pages_plot <- renderPlotly({
-    p <- top_pages %>%
-      arrange(desc(view_count)) %>%
-      mutate(page_name = gsub("/perpustakaan/", "", page_url)) %>%
-      mutate(page_name = gsub("-", " ", page_name)) %>%
-      head(10) %>%
-      ggplot(aes(x = reorder(page_name, view_count), y = view_count)) +
+  # Pages chart
+  output$pages_chart <- renderPlotly({
+    p <- pages_data %>%
+      head(5) %>%
+      ggplot(aes(x = reorder(page_url, view_count), y = view_count)) +
       geom_col(fill = "#2ecc71", alpha = 0.8) +
       coord_flip() +
-      labs(title = "Top 10 Halaman Populer",
-           x = "Halaman",
-           y = "Jumlah View") +
+      labs(title = "Top 5 Halaman", x = "Halaman", y = "Views") +
       theme_minimal()
     
     ggplotly(p)
   })
   
-  # Top Pages Table
-  output$top_pages_table <- DT::renderDataTable({
-    top_pages %>%
-      arrange(desc(view_count)) %>%
+  # Pages table
+  output$pages_table <- DT::renderDataTable({
+    pages_data %>%
       DT::datatable(
-        options = list(pageLength = 10, scrollX = TRUE),
-        colnames = c("URL Halaman", "Jumlah View")
-      )
-  })
-  
-  # User Actions Plot
-  output$user_actions_plot <- renderPlotly({
-    p <- user_actions %>%
-      ggplot(aes(x = reorder(action_type, action_count), y = action_count)) +
-      geom_col(fill = "#f39c12", alpha = 0.8) +
-      coord_flip() +
-      labs(title = "Distribusi Aktivitas User",
-           x = "Jenis Aktivitas",
-           y = "Jumlah") +
-      theme_minimal()
-    
-    ggplotly(p)
-  })
-  
-  # User Actions Table
-  output$user_actions_table <- DT::renderDataTable({
-    user_actions %>%
-      arrange(desc(action_count)) %>%
-      DT::datatable(
-        options = list(pageLength = 10),
-        colnames = c("Jenis Aktivitas", "Jumlah")
+        options = list(pageLength = 8),
+        colnames = c("Halaman", "Views")
       )
   })
 }
 
-# Run the application
+# Run the app
 shinyApp(ui = ui, server = server)
