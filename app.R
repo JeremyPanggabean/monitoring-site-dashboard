@@ -1,4 +1,4 @@
-# Load required libraries
+# Load required libraries (essential only)
 library(shiny)
 library(shinydashboard)
 library(DT)
@@ -6,11 +6,8 @@ library(plotly)
 library(dplyr)
 library(RPostgreSQL)
 library(ggplot2)
-library(shinydashboardPlus)
-library(fresh)
-library(shinyWidgets)
 
-# Enhanced database connection function with better error handling
+# Enhanced database connection function
 get_db_connection <- function() {
   tryCatch({
     dbConnect(
@@ -66,91 +63,79 @@ default_daily <- data.frame(
   bounce_rate = c(0.32, 0.28, 0.35, 0.25, 0.22, 0.29, 0.20, 0.18, 0.15, 0.24, 0.21, 0.17, 0.14, 0.12, 0.19)
 )
 
-default_pages <- data.frame(
-  page_url = c(
-    "/perpustakaan/jurnal/teknologi-informasi", "/perpustakaan/buku/teknologi-pertanian",
-    "/perpustakaan/buku/komputer-dan-teknologi", "/perpustakaan/buku/nutrisi-dan-kesehatan",
-    "/perpustakaan/buku/administrasi-bisnis", "/perpustakaan/buku/keperawatan",
-    "/perpustakaan/buku/manajemen-proyek", "/perpustakaan/jurnal/hukum-perdata",
-    "/perpustakaan/buku/ekonomi-makro", "/perpustakaan/jurnal/psikologi-pendidikan",
-    "/perpustakaan/buku/akuntansi-dasar", "/perpustakaan/jurnal/kedokteran-umum",
-    "/perpustakaan/buku/statistika-terapan", "/perpustakaan/buku/bahasa-indonesia",
-    "/perpustakaan/jurnal/biologi-molekuler", "/perpustakaan/buku/fisika-kuantum",
-    "/perpustakaan/buku/kimia-organik", "/perpustakaan/jurnal/sejarah-indonesia",
-    "/perpustakaan/buku/matematika-diskrit", "/perpustakaan/jurnal/geografi-fisik"
-  ),
-  view_count = c(120, 110, 100, 99, 98, 97, 95, 95, 88, 85, 82, 79, 76, 74, 71, 68, 65, 62, 59, 56),
-  category = c(
-    "Teknologi", "Pertanian", "Teknologi", "Kesehatan", "Bisnis", "Kesehatan",
-    "Manajemen", "Hukum", "Ekonomi", "Psikologi", "Ekonomi", "Kedokteran",
-    "Matematika", "Bahasa", "Biologi", "Fisika", "Kimia", "Sejarah", "Matematika", "Geografi"
+# Generate 60 sample pages
+generate_sample_pages <- function(n = 60) {
+  categories <- c("Teknologi", "Kesehatan", "Ekonomi", "Hukum", "Pendidikan", "Sains", "Sosial", "Budaya")
+  subjects <- c("jurnal", "buku", "skripsi", "artikel", "penelitian")
+  topics <- c("informatika", "komputer", "manajemen", "akuntansi", "biologi", "fisika", "kimia", 
+              "matematika", "psikologi", "sosiologi", "sejarah", "bahasa", "kesehatan", "nutrisi",
+              "administrasi", "bisnis", "ekonomi", "keuangan", "pemasaran", "teknologi")
+  
+  pages <- data.frame(
+    page_url = character(n),
+    view_count = integer(n),
+    category = character(n),
+    stringsAsFactors = FALSE
   )
-)
+  
+  for (i in 1:n) {
+    subject <- sample(subjects, 1)
+    topic <- sample(topics, 1)
+    category <- sample(categories, 1)
+    
+    pages$page_url[i] <- paste0("/perpustakaan/", subject, "/", topic, "-", sample(1:999, 1))
+    pages$view_count[i] <- max(1, round(rnorm(1, mean = 80, sd = 30)))
+    pages$category[i] <- category
+  }
+  
+  # Sort by view_count descending
+  pages <- pages[order(pages$view_count, decreasing = TRUE), ]
+  return(pages)
+}
 
-# Custom theme
-my_theme <- create_theme(
-  adminlte_color(
-    light_blue = "#3498db",
-    blue = "#2980b9",
-    navy = "#1f3a93",
-    green = "#27ae60",
-    yellow = "#f39c12",
-    red = "#e74c3c"
-  ),
-  adminlte_sidebar(
-    dark_bg = "#2c3e50",
-    dark_hover_bg = "#34495e",
-    dark_color = "#ecf0f1"
-  ),
-  adminlte_global(
-    content_bg = "#f8f9fa"
-  )
-)
+default_pages <- generate_sample_pages(60)
 
-# Enhanced UI with better styling
+# Enhanced UI
 ui <- dashboardPage(
   dashboardHeader(
     title = "📚 Dashboard Perpustakaan Digital",
-    titleWidth = 300,
-    dropdownMenu(
-      type = "notifications",
-      notificationItem(
-        text = "Database terhubung",
-        icon = icon("database"),
-        status = "success"
-      )
-    )
+    titleWidth = 320
   ),
   
   dashboardSidebar(
-    width = 300,
+    width = 320,
     sidebarMenu(
       id = "sidebar",
       menuItem("🏠 Dashboard Utama", tabName = "dashboard", icon = icon("tachometer-alt")),
       menuItem("⭐ Halaman Populer", tabName = "pages", icon = icon("star")),
       menuItem("📊 Analisis Kategori", tabName = "categories", icon = icon("chart-pie")),
-      menuItem("📈 Trend Analysis", tabName = "trends", icon = icon("line-chart")),
-      menuItem("📋 Laporan Detail", tabName = "reports", icon = icon("file-alt"))
+      menuItem("📈 Trend Analysis", tabName = "trends", icon = icon("line-chart"))
     )
   ),
   
   dashboardBody(
-    use_theme(my_theme),
-    
+    # Custom CSS for better styling
     tags$head(
       tags$style(HTML("
         .content-wrapper, .right-side {
           background-color: #f4f7fc;
         }
         .box {
-          border-radius: 10px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          border-top: 3px solid #3498db;
         }
         .value-box {
-          border-radius: 10px;
+          border-radius: 8px;
         }
-        .nav-tabs-custom > .nav-tabs > li.active {
-          border-top-color: #3498db;
+        .value-box .value-box-icon {
+          border-radius: 8px 0 0 8px;
+        }
+        .main-header .navbar {
+          background-color: #34495e !important;
+        }
+        .main-sidebar {
+          background-color: #2c3e50 !important;
         }
       "))
     ),
@@ -179,32 +164,32 @@ ui <- dashboardPage(
             status = "info",
             solidHeader = TRUE,
             width = 4,
-            tableOutput("summary_stats")
+            tableOutput("summary_stats"),
+            hr(),
+            div(
+              style = "text-align: center;",
+              actionButton("refresh_data", "🔄 Refresh Data", 
+                         class = "btn btn-primary"),
+              br(), br(),
+              textOutput("last_update")
+            )
           )
         ),
         
         fluidRow(
           box(
-            title = "🎯 Bounce Rate & Engagement",
+            title = "🎯 Bounce Rate Trend",
             status = "warning",
             solidHeader = TRUE,
             width = 6,
-            plotlyOutput("engagement_chart")
+            plotlyOutput("bounce_chart")
           ),
           box(
-            title = "📱 Aktivitas Real-time",
+            title = "📊 Page Views vs Visitors",
             status = "success",
             solidHeader = TRUE,
             width = 6,
-            div(
-              style = "text-align: center; padding: 20px;",
-              h3("Status Sistem", style = "color: #27ae60;"),
-              br(),
-              actionButton("refresh_data", "🔄 Refresh Data", 
-                         class = "btn btn-success btn-lg"),
-              br(), br(),
-              textOutput("last_update")
-            )
+            plotlyOutput("correlation_chart")
           )
         )
       ),
@@ -221,7 +206,7 @@ ui <- dashboardPage(
             fluidRow(
               column(4,
                 sliderInput("top_n", "Jumlah halaman teratas:",
-                           min = 5, max = 60, value = 10, step = 5)
+                           min = 5, max = 60, value = 15, step = 5)
               ),
               column(4,
                 selectInput("category_filter", "Filter Kategori:",
@@ -255,7 +240,7 @@ ui <- dashboardPage(
         )
       ),
       
-      # New category analysis tab
+      # Category analysis tab
       tabItem(
         tabName = "categories",
         fluidRow(
@@ -286,7 +271,7 @@ ui <- dashboardPage(
         )
       ),
       
-      # New trends analysis tab
+      # Trends analysis tab
       tabItem(
         tabName = "trends",
         fluidRow(
@@ -295,48 +280,24 @@ ui <- dashboardPage(
             status = "primary",
             solidHeader = TRUE,
             width = 12,
-            plotlyOutput("multi_trend_chart", height = "500px")
+            plotlyOutput("multi_trend_chart", height = "400px")
           )
         ),
         
         fluidRow(
           box(
-            title = "📊 Korelasi Metrics",
+            title = "📊 Weekly Growth Rate",
             status = "success",
             solidHeader = TRUE,
             width = 6,
-            plotlyOutput("correlation_chart")
+            plotlyOutput("growth_chart")
           ),
           box(
-            title = "📈 Growth Rate",
+            title = "📈 Performance Metrics",
             status = "warning",
             solidHeader = TRUE,
             width = 6,
-            plotlyOutput("growth_chart")
-          )
-        )
-      ),
-      
-      # New detailed reports tab
-      tabItem(
-        tabName = "reports",
-        fluidRow(
-          box(
-            title = "📋 Laporan Komprehensif",
-            status = "primary",
-            solidHeader = TRUE,
-            width = 12,
-            tabsetPanel(
-              tabPanel("Daily Report", 
-                      br(),
-                      DT::dataTableOutput("daily_report")),
-              tabPanel("Weekly Summary", 
-                      br(),
-                      DT::dataTableOutput("weekly_report")),
-              tabPanel("Top Performers", 
-                      br(),
-                      DT::dataTableOutput("top_performers"))
-            )
+            plotlyOutput("performance_chart")
           )
         )
       )
@@ -344,7 +305,7 @@ ui <- dashboardPage(
   )
 )
 
-# Enhanced Server with more functionality
+# Enhanced Server
 server <- function(input, output, session) {
   
   # Reactive data loading
@@ -365,7 +326,7 @@ server <- function(input, output, session) {
   # Update category choices
   observe({
     pages <- pages_data()
-    categories <- c("Semua" = "all", unique(pages$category))
+    categories <- c("Semua" = "all", sort(unique(pages$category)))
     updateSelectInput(session, "category_filter", choices = categories)
   })
   
@@ -419,7 +380,7 @@ server <- function(input, output, session) {
     )
   })
   
-  # Enhanced visits chart with multiple metrics
+  # Enhanced visits chart
   output$visits_chart <- renderPlotly({
     daily <- daily_data()
     if ("summary_date" %in% names(daily)) {
@@ -433,15 +394,39 @@ server <- function(input, output, session) {
       geom_point(aes(y = unique_users, color = "Unique Users"), size = 3) +
       labs(title = "", x = "Tanggal", y = "Jumlah", color = "Metrik") +
       theme_minimal() +
-      theme(
-        legend.position = "bottom",
-        plot.background = element_rect(fill = "white", color = NA),
-        panel.background = element_rect(fill = "white", color = NA)
-      ) +
+      theme(legend.position = "bottom") +
       scale_color_manual(values = c("Total Visits" = "#3498db", "Unique Users" = "#27ae60"))
     
-    ggplotly(p, tooltip = c("x", "y", "colour")) %>%
-      layout(hovermode = "x unified")
+    ggplotly(p, tooltip = c("x", "y", "colour"))
+  })
+  
+  # Bounce rate chart
+  output$bounce_chart <- renderPlotly({
+    daily <- daily_data()
+    if ("summary_date" %in% names(daily)) {
+      daily$summary_date <- as.Date(daily$summary_date)
+    }
+    
+    p <- ggplot(daily, aes(x = summary_date, y = bounce_rate * 100)) +
+      geom_line(color = "#e74c3c", size = 1.2) +
+      geom_point(color = "#e74c3c", size = 3) +
+      labs(title = "", x = "Tanggal", y = "Bounce Rate (%)") +
+      theme_minimal()
+    
+    ggplotly(p)
+  })
+  
+  # Correlation chart
+  output$correlation_chart <- renderPlotly({
+    daily <- daily_data()
+    
+    p <- ggplot(daily, aes(x = total_visits, y = unique_users)) +
+      geom_point(aes(size = avg_session_duration_minutes), alpha = 0.7, color = "#3498db") +
+      geom_smooth(method = "lm", se = FALSE, color = "#e74c3c") +
+      labs(title = "", x = "Total Visits", y = "Unique Users", size = "Avg Duration") +
+      theme_minimal()
+    
+    ggplotly(p)
   })
   
   # Enhanced pages chart
@@ -450,28 +435,24 @@ server <- function(input, output, session) {
     
     # Truncate long URLs for better display
     pages$short_url <- sapply(pages$page_url, function(x) {
-      if (nchar(x) > 40) {
-        paste0("...", substr(x, nchar(x)-37, nchar(x)))
+      if (nchar(x) > 35) {
+        paste0("...", substr(x, nchar(x)-32, nchar(x)))
       } else {
         x
       }
     })
     
     p <- pages %>%
+      head(10) %>%  # Limit to top 10 for chart readability
       ggplot(aes(x = reorder(short_url, view_count), y = view_count, fill = category)) +
       geom_col(alpha = 0.8) +
       coord_flip() +
       labs(title = "", x = "Halaman", y = "Views", fill = "Kategori") +
       theme_minimal() +
-      theme(
-        legend.position = "bottom",
-        plot.background = element_rect(fill = "white", color = NA),
-        panel.background = element_rect(fill = "white", color = NA)
-      ) +
+      theme(legend.position = "bottom") +
       scale_fill_brewer(type = "qual", palette = "Set3")
     
-    ggplotly(p, tooltip = c("y", "fill")) %>%
-      layout(hovermode = "y unified")
+    ggplotly(p, tooltip = c("y", "fill"))
   })
   
   # Enhanced pages table
@@ -483,52 +464,25 @@ server <- function(input, output, session) {
         options = list(
           pageLength = 10,
           scrollX = TRUE,
-          dom = 'Bfrtip',
-          buttons = c('copy', 'csv', 'excel')
+          searching = TRUE
         ),
-        colnames = c("Halaman", "Views", "Kategori"),
-        extensions = 'Buttons'
-      ) %>%
-      formatStyle("view_count", 
-                  background = styleColorBar(pages$view_count, '#3498db'),
-                  backgroundSize = '100% 90%',
-                  backgroundRepeat = 'no-repeat',
-                  backgroundPosition = 'center')
+        colnames = c("Halaman", "Views", "Kategori")
+      )
   })
   
   # Summary stats table
   output$summary_stats <- renderTable({
     daily <- daily_data()
     data.frame(
-      Metric = c("Avg Daily Visits", "Peak Day Visits", "Avg Session Duration", "Best Engagement Day"),
+      Metric = c("Avg Daily Visits", "Peak Day Visits", "Avg Session (min)", "Total Days"),
       Value = c(
         round(mean(daily$total_visits, na.rm = TRUE), 0),
         max(daily$total_visits, na.rm = TRUE),
-        paste0(round(mean(daily$avg_session_duration_minutes, na.rm = TRUE), 1), " min"),
-        as.character(daily$summary_date[which.max(daily$total_visits)])
+        round(mean(daily$avg_session_duration_minutes, na.rm = TRUE), 1),
+        nrow(daily)
       )
     )
   }, striped = TRUE, bordered = TRUE)
-  
-  # Engagement chart
-  output$engagement_chart <- renderPlotly({
-    daily <- daily_data()
-    if ("summary_date" %in% names(daily)) {
-      daily$summary_date <- as.Date(daily$summary_date)
-    }
-    
-    p <- ggplot(daily, aes(x = summary_date)) +
-      geom_line(aes(y = bounce_rate * 100), color = "#e74c3c", size = 1.2) +
-      geom_point(aes(y = bounce_rate * 100), color = "#e74c3c", size = 3) +
-      labs(title = "", x = "Tanggal", y = "Bounce Rate (%)") +
-      theme_minimal() +
-      theme(
-        plot.background = element_rect(fill = "white", color = NA),
-        panel.background = element_rect(fill = "white", color = NA)
-      )
-    
-    ggplotly(p)
-  })
   
   # Category analysis
   output$category_pie <- renderPlotly({
@@ -542,8 +496,7 @@ server <- function(input, output, session) {
             values = ~total_views, 
             type = 'pie',
             textinfo = 'label+percent',
-            textposition = 'inside',
-            hovertemplate = '%{label}<br>Views: %{value}<br>Percentage: %{percent}<extra></extra>') %>%
+            textposition = 'inside') %>%
       layout(title = "")
   })
   
@@ -553,7 +506,6 @@ server <- function(input, output, session) {
       group_by(category) %>%
       summarise(
         total_views = sum(view_count),
-        avg_views = mean(view_count),
         count = n(),
         .groups = 'drop'
       )
@@ -575,49 +527,30 @@ server <- function(input, output, session) {
         total_views = sum(view_count),
         avg_views = round(mean(view_count), 1),
         count = n(),
-        top_page = page_url[which.max(view_count)],
         .groups = 'drop'
       ) %>%
       arrange(desc(total_views))
     
     DT::datatable(category_summary,
                   options = list(pageLength = 15),
-                  colnames = c("Kategori", "Total Views", "Avg Views", "Jumlah Halaman", "Top Page"))
+                  colnames = c("Kategori", "Total Views", "Avg Views", "Jumlah Halaman"))
   })
   
   # Multi-metric trends
   output$multi_trend_chart <- renderPlotly({
     daily <- daily_data()
+    if ("summary_date" %in% names(daily)) {
+      daily$summary_date <- as.Date(daily$summary_date)
+    }
     
-    # Normalize data for comparison
-    daily_norm <- daily %>%
-      mutate(
-        visits_norm = (total_visits - min(total_visits)) / (max(total_visits) - min(total_visits)),
-        users_norm = (unique_users - min(unique_users)) / (max(unique_users) - min(unique_users)),
-        duration_norm = (avg_session_duration_minutes - min(avg_session_duration_minutes)) / 
-                       (max(avg_session_duration_minutes) - min(avg_session_duration_minutes))
-      )
-    
-    p <- ggplot(daily_norm, aes(x = summary_date)) +
-      geom_line(aes(y = visits_norm, color = "Visits"), size = 1.2) +
-      geom_line(aes(y = users_norm, color = "Users"), size = 1.2) +
-      geom_line(aes(y = duration_norm, color = "Duration"), size = 1.2) +
-      labs(title = "", x = "Date", y = "Normalized Value", color = "Metric") +
+    p <- ggplot(daily, aes(x = summary_date)) +
+      geom_line(aes(y = total_visits, color = "Visits"), size = 1.2) +
+      geom_line(aes(y = unique_users, color = "Users"), size = 1.2) +
+      geom_line(aes(y = avg_session_duration_minutes * 2, color = "Duration (x2)"), size = 1.2) +
+      labs(title = "", x = "Date", y = "Count", color = "Metric") +
       theme_minimal() +
-      scale_color_manual(values = c("Visits" = "#3498db", "Users" = "#27ae60", "Duration" = "#f39c12"))
-    
-    ggplotly(p)
-  })
-  
-  # Correlation chart
-  output$correlation_chart <- renderPlotly({
-    daily <- daily_data()
-    
-    p <- ggplot(daily, aes(x = total_visits, y = unique_users)) +
-      geom_point(aes(size = avg_session_duration_minutes), alpha = 0.7, color = "#3498db") +
-      geom_smooth(method = "lm", se = FALSE, color = "#e74c3c") +
-      labs(title = "", x = "Total Visits", y = "Unique Users", size = "Avg Duration") +
-      theme_minimal()
+      theme(legend.position = "bottom") +
+      scale_color_manual(values = c("Visits" = "#3498db", "Users" = "#27ae60", "Duration (x2)" = "#f39c12"))
     
     ggplotly(p)
   })
@@ -637,44 +570,28 @@ server <- function(input, output, session) {
     ggplotly(p)
   })
   
-  # Report tables
-  output$daily_report <- DT::renderDataTable({
+  # Performance chart
+  output$performance_chart <- renderPlotly({
     daily <- daily_data()
-    DT::datatable(daily, options = list(pageLength = 15, scrollX = TRUE))
-  })
-  
-  output$weekly_report <- DT::renderDataTable({
-    daily <- daily_data()
-    # Create weekly summary
-    daily$week <- format(daily$summary_date, "%Y-W%U")
-    weekly <- daily %>%
-      group_by(week) %>%
-      summarise(
-        avg_visits = round(mean(total_visits), 1),
-        total_visits = sum(total_visits),
-        avg_users = round(mean(unique_users), 1),
-        avg_duration = round(mean(avg_session_duration_minutes), 1),
-        .groups = 'drop'
-      )
     
-    DT::datatable(weekly, options = list(pageLength = 10))
-  })
-  
-  output$top_performers <- DT::renderDataTable({
-    pages <- head(pages_data(), 20)
-    DT::datatable(pages, options = list(pageLength = 15, scrollX = TRUE))
+    p <- ggplot(daily, aes(x = avg_session_duration_minutes, y = total_visits)) +
+      geom_point(aes(size = unique_users, color = bounce_rate), alpha = 0.7) +
+      labs(title = "", x = "Avg Session Duration", y = "Total Visits", 
+           size = "Unique Users", color = "Bounce Rate") +
+      theme_minimal() +
+      scale_color_gradient(low = "#27ae60", high = "#e74c3c")
+    
+    ggplotly(p)
   })
   
   # Refresh functionality
   observeEvent(input$refresh_data, {
     showNotification("Data sedang di-refresh...", type = "message")
-    # Force reactive data to reload
     session$reload()
-    showNotification("Data berhasil di-refresh!", type = "success")
   })
   
   output$last_update <- renderText({
-    paste("Last updated:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"))
+    paste("Last updated:", format(Sys.time(), "%H:%M:%S"))
   })
   
   # Download handler
@@ -688,5 +605,5 @@ server <- function(input, output, session) {
   )
 }
 
-# Run the enhanced app
+# Run the app
 shinyApp(ui = ui, server = server)
