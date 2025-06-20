@@ -87,7 +87,7 @@ server <- function(input, output) {
   })
 
   actions_data <- reactive({
-    safe_query("SELECT * FROM user_actions ORDER BY view_count DESC")
+    safe_query("SELECT * FROM user_actions ORDER BY view_count ASC")
   })
 
   output$total_visits <- renderValueBox({
@@ -120,11 +120,12 @@ server <- function(input, output) {
 
   output$pages_plot <- renderPlotly({
     df <- head(pages_data(), 5)
-    colors <- c('#1abc9c', '#3498db', '#9b59b6', '#f39c12', '#e74c3c')
-    plot_ly(df, labels = ~page_url, values = ~view_count, type = 'pie',
-            textinfo = 'label+percent', insidetextorientation = 'radial',
-            marker = list(colors = colors)) %>%
-      layout(title = "Proporsi Kunjungan - Top 5 Halaman Terpopuler")
+    df <- df[order(df$view_count), ]
+    plot_ly(df, x = ~view_count, y = ~reorder(page_url, view_count), type = 'bar', orientation = 'h',
+            marker = list(color = '#3498db')) %>%
+      layout(title = "Halaman Paling Jarang Dikunjungi (5 Terbawah)",
+             xaxis = list(title = "Jumlah Kunjungan"),
+             yaxis = list(title = "Halaman"))
   })
 
   output$actions_table <- renderDT({
@@ -132,12 +133,12 @@ server <- function(input, output) {
   })
 
   output$actions_plot <- renderPlotly({
-  df <- tail(actions_data(), 5)
-  colors <- c('#e67e22', '#2980b9', '#16a085', '#c0392b', '#8e44ad')
-  plot_ly(df, labels = ~page_url, values = ~view_count, type = 'pie',
-          textinfo = 'label+percent', insidetextorientation = 'radial',
-          marker = list(colors = colors)) %>%
-    layout(title = "Proporsi Aktivitas Pengguna - 5 Halaman Paling Jarang Dikunjungi")
+    df <- head(actions_data(), 5)
+    plot_ly(df, x = ~view_count, y = ~reorder(page_url, view_count), type = 'bar', orientation = 'h',
+            marker = list(color = '#f39c12')) %>%
+      layout(title = "Halaman dengan Aktivitas Pengguna Rendah (5 Terbawah)",
+             xaxis = list(title = "Jumlah Aktivitas"),
+             yaxis = list(title = "Halaman"))
   })
 }
 
