@@ -36,7 +36,7 @@ safe_query <- function(sql, default = data.frame()) {
 }
 
 ui <- dashboardPage(
-  dashboardHeader(title = "📚 Dashboard Monitoring Site Perpustakaan Digital"),
+  dashboardHeader(title = "📚 Dashboard Perpustakaan"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
@@ -119,10 +119,12 @@ server <- function(input, output) {
   })
 
   output$pages_plot <- renderPlotly({
-    df <- head(pages_data(), 10)
-    plot_ly(df, y = ~reorder(page_url, view_count), x = ~view_count, type = "bar", orientation = "h",
-            marker = list(color = 'rgba(58, 71, 80, 0.6)', line = list(color = 'rgba(58, 71, 80, 1.0)', width = 1))) %>%
-      layout(title = "Top 10 Halaman Terpopuler", xaxis = list(title = "Jumlah Kunjungan"), yaxis = list(title = "Halaman"))
+    df <- head(pages_data(), 5)
+    colors <- c('#1abc9c', '#3498db', '#9b59b6', '#f39c12', '#e74c3c')
+    plot_ly(df, labels = ~page_url, values = ~view_count, type = 'pie',
+            textinfo = 'label+percent', insidetextorientation = 'radial',
+            marker = list(colors = colors)) %>%
+      layout(title = "Proporsi Kunjungan - Top 5 Halaman Terpopuler")
   })
 
   output$actions_table <- renderDT({
@@ -130,9 +132,12 @@ server <- function(input, output) {
   })
 
   output$actions_plot <- renderPlotly({
-    df <- head(actions_data(), 10)
-    plot_ly(df, x = ~reorder(page_url, view_count), y = ~view_count, type = "bar", marker = list(color = '#FF5733')) %>%
-      layout(title = "Aktivitas Pengguna Teratas", xaxis = list(title = "Halaman"), yaxis = list(title = "Jumlah Aksi"))
+  df <- tail(actions_data(), 5)
+  colors <- c('#e67e22', '#2980b9', '#16a085', '#c0392b', '#8e44ad')
+  plot_ly(df, labels = ~page_url, values = ~view_count, type = 'pie',
+          textinfo = 'label+percent', insidetextorientation = 'radial',
+          marker = list(colors = colors)) %>%
+    layout(title = "Proporsi Aktivitas Pengguna - 5 Halaman Paling Jarang Dikunjungi")
   })
 }
 
