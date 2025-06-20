@@ -36,7 +36,7 @@ safe_query <- function(sql, default = data.frame()) {
 }
 
 ui <- dashboardPage(
-  dashboardHeader(title = "📚 Dashboard Perpustakaan"),
+  dashboardHeader(title = "📚 Dashboard Monitoring Site Perpustakaan Digital"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
@@ -68,7 +68,8 @@ ui <- dashboardPage(
       tabItem(tabName = "actions",
               fluidRow(
                 box(title = "Aktivitas Pengguna", width = 12,
-                    DTOutput("actions_table"))
+                    DTOutput("actions_table"),
+                    plotlyOutput("actions_plot"))
               )
       )
     )
@@ -86,7 +87,7 @@ server <- function(input, output) {
   })
 
   actions_data <- reactive({
-    safe_query("SELECT * FROM user_actions ORDER BY timestamp DESC LIMIT 100")
+    safe_query("SELECT * FROM user_actions ORDER BY view_count DESC")
   })
 
   output$total_visits <- renderValueBox({
@@ -119,12 +120,19 @@ server <- function(input, output) {
 
   output$pages_plot <- renderPlotly({
     df <- head(pages_data(), 10)
-    plot_ly(df, x = ~reorder(page_url, view_count), y = ~view_count, type = "bar", orientation = "v") %>%
-      layout(xaxis = list(title = "Halaman"), yaxis = list(title = "View Count"))
+    plot_ly(df, y = ~reorder(page_url, view_count), x = ~view_count, type = "bar", orientation = "h",
+            marker = list(color = 'rgba(58, 71, 80, 0.6)', line = list(color = 'rgba(58, 71, 80, 1.0)', width = 1))) %>%
+      layout(title = "Top 10 Halaman Terpopuler", xaxis = list(title = "Jumlah Kunjungan"), yaxis = list(title = "Halaman"))
   })
 
   output$actions_table <- renderDT({
     datatable(actions_data(), options = list(pageLength = 10))
+  })
+
+  output$actions_plot <- renderPlotly({
+    df <- head(actions_data(), 10)
+    plot_ly(df, x = ~reorder(page_url, view_count), y = ~view_count, type = "bar", marker = list(color = '#FF5733')) %>%
+      layout(title = "Aktivitas Pengguna Teratas", xaxis = list(title = "Halaman"), yaxis = list(title = "Jumlah Aksi"))
   })
 }
 
